@@ -1,4 +1,3 @@
-Manifest.toml
 .vscode
 .DS_Store
 variable_dump/*
@@ -8,3 +7,14 @@ loop_over_sims.jl
 process_results.jl
 sandbox.jl
 docs/build/*
+# Gurobi licence files (private credentials)
+gurobi.lic
+*.lic
+.gstack/
+# Local tool folders and caches
+.agents/
+.claude/
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+.ipynb_checkpoints/

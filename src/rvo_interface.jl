@@ -64,7 +64,7 @@ function rvo_new_sim(;
 end
 
 # global RVO_SIM_WRAPPER = RVOSimWrapper(nothing)
-global RVO_SIM_WRAPPER = CachedElement{Any}(nothing, false, time())
+global RVO_SIM_WRAPPER = CachedElement{Any}(nothing, false, next_time_stamp())
 rvo_global_sim_wrapper() = RVO_SIM_WRAPPER
 function rvo_set_new_sim!(sim=rvo_new_sim())
     set_element!(rvo_global_sim_wrapper(), sim)

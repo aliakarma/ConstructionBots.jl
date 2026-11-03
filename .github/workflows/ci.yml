@@ -3,13 +3,17 @@ on:
   push:
     branches:
       - master
+      - fork-work
     tags: '*'
   pull_request:
+  workflow_dispatch:
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+permissions:
+  contents: read
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
@@ -18,37 +22,64 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          # - '1.6'
-          - '1'
+          - '1.10' # the version recorded in Manifest.toml
         os:
-          - ubuntu-latest
-          # - macOS-latest
-          # - windows-latest
+          - ubuntu-22.04
         arch:
           - x64
+    defaults:
+      run:
+        shell: bash -el {0} # needed for conda
     steps:
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-activate-base: true
+      - uses: actions/cache@v4
+        with:
+          path: ~/Documents/ldraw
+          key: ldraw-library-v1
+      - name: Build RVO2 and download the LDraw parts library
+        run: bash scripts/setup_rvo2.sh
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v1
+      - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
-      # - uses: julia-actions/julia-runtest@v1
-      # - uses: julia-actions/julia-processcoverage@v1
-      # - uses: codecov/codecov-action@v3
-        # env:
-          # CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        # with:
-          # files: lcov.info
-  docs:
-    name: Documentation
-    permissions: write-all
+      - uses: julia-actions/julia-runtest@v1
+  dashboard:
+    name: Dashboard tests and notebook checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r dashboard/requirements.txt
+      - run: python -m pytest
+        working-directory: dashboard
+      - name: The notebook is committed without outputs
+        run: |
+          python - <<'EOF'
+          import json
+          nb = json.load(open("notebooks/ConstructionBots_Experiment_Lab.ipynb", encoding="utf8"))
+          dirty = [i for i, c in enumerate(nb["cells"]) if c["cell_type"] == "code" and (c["outputs"] or c["execution_count"])]
+          assert not dirty, f"clear the outputs of cells {dirty}: jupyter nbconvert --clear-output --inplace <notebook>"
+          EOF
+  docs:
+    name: Documentation
+    # Runs only on request: deploying needs GitHub Pages to be switched on for this repository.
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.10'
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-docdeploy@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

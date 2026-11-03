@@ -1,0 +1,168 @@
+<!doctype html>
+<!--
+  Animation player for notebooks/ConstructionBots_Experiment_Lab.ipynb.
+  Filled in by notebook_helpers.jl (_player_page), which replaces the double-underscore
+  placeholders below: the title, the scene frame's attribute (data-b64 = the whole saved
+  file in base64, or src = its URL on the kernel's viewer server) and the raw-file link.
+  (Do not write the placeholder names in this comment: every occurrence is replaced.)
+  It shows the run's saved MeshCat file, unchanged, in a frame and
+  drives MeshCat's own animation player (viewer.animator) from the controls
+  below it. Adapted from dashboard/simulation/player.html.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Experiment Lab animation</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #F5F5F2; color: #202A32;
+    font: 13px/1.4 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  .shell { display: flex; flex-direction: column; height: 100%; }
+  .stage { position: relative; flex: 1 1 auto; min-height: 200px; overflow: hidden;
+    background: linear-gradient(#F5F5F2, #D9DFE1); }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 24px; text-align: center; color: #687581; background: linear-gradient(#F5F5F2, #E3E8E9); }
+  .hidden { display: none !important; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; background: #fff;
+    border-top: 1px solid #DDE2E4; }
+  button, select { font: inherit; color: #202A32; background: #fff; border: 1px solid #DDE2E4; border-radius: 5px;
+    padding: 3px 9px; cursor: pointer; }
+  button:hover, select:hover { border-color: #456A8A; }
+  button.primary { background: #147D83; border-color: #147D83; color: #fff; min-width: 60px; }
+  button:disabled, select:disabled { opacity: .45; cursor: default; }
+  input[type=range] { flex: 1 1 140px; min-width: 100px; accent-color: #147D83; }
+  .time { font-variant-numeric: tabular-nums; color: #687581; min-width: 110px; }
+  .title { padding: 3px 8px; color: #687581; font-size: 12px; background: #fff; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="title" id="title">__TITLE__</div>
+  <div class="stage">
+    <iframe id="scene" title="3D animation of the simulation" __SCENE__></iframe>
+    <div class="overlay" id="overlay" role="status">Loading the saved animation…</div>
+  </div>
+  <div class="bar" role="toolbar" aria-label="Playback controls">
+    <button id="play" class="primary" disabled>Play</button>
+    <button id="restart" disabled>Restart</button>
+    <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Playback position" disabled>
+    <span class="time" id="time">–</span>
+    <select id="speed" aria-label="Playback speed" disabled>
+      <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option>
+      <option value="2">2×</option><option value="4">4×</option>
+    </select>
+    <button id="fit" disabled title="Frame the whole construction site">Reset view</button>
+    <button id="gui" disabled title="MeshCat's own scene controls">Scene controls</button>
+    __RAW_LINK__
+  </div>
+</div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+// Embedded mode: the saved file arrives base64-encoded (no HTML escaping, so it stays small).
+if ($("scene").dataset.b64) {
+  const bin = atob($("scene").dataset.b64), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  $("scene").srcdoc = new TextDecoder().decode(bytes);
+}
+let viewer = null, guiShown = false;
+
+function anim() { return viewer && viewer.animator; }
+function duration() { const a = anim(); return a ? a.duration || 0 : 0; }
+function currentTime() {
+  const a = anim(); if (!a || !a.actions.length) return 0;
+  return a.actions.reduce((m, x) => Math.max(m, x.time), 0);
+}
+function seek(t) {
+  const a = anim(); if (!a || !a.actions.length) return;
+  if (!a.playing) { a.play(); a.seek(t); a.pause(); } else { a.seek(t); }
+}
+function fmt(s) { return (Math.round(s * 10) / 10).toFixed(1); }
+
+function tick() {
+  const a = anim();
+  if (a && a.actions.length) {
+    const t = currentTime(), d = duration();
+    if (document.activeElement !== $("scrub")) $("scrub").value = d > 0 ? Math.round(1000 * t / d) : 0;
+    $("time").textContent = fmt(t) + " / " + fmt(d) + " s";
+    $("play").textContent = a.playing ? "Pause" : "Play";
+  }
+  requestAnimationFrame(tick);
+}
+
+// Size of the working area: a high percentile of the distances of all animated positions
+// from the origin (robots parked far away do not dominate); falls back to visible meshes.
+function sceneRadius() {
+  const ds = []; const a = anim();
+  if (a) for (const act of a.actions) for (const tr of act._clip.tracks) {
+    if (!tr.name.endsWith(".position")) continue;
+    const v = tr.values; for (let i = 0; i + 2 < v.length; i += 3) ds.push(Math.hypot(v[i], v[i + 1], v[i + 2]));
+  }
+  if (ds.length) { ds.sort((x, y) => x - y); return ds[Math.floor(0.85 * (ds.length - 1))]; }
+  const V = viewer.camera.position.constructor; const w = new V(); let r = 0;
+  viewer.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    for (let p = o; p; p = p.parent) if (!p.visible) return;
+    o.getWorldPosition(w); const d = Math.hypot(w.x, w.y, w.z); if (isFinite(d)) r = Math.max(r, d);
+  });
+  return r;
+}
+function fitView() {
+  if (!viewer) return;
+  let r = sceneRadius(); if (!(r > 0)) r = 3;
+  const d = Math.max(0.6, r * 0.95);
+  viewer.set_property(["Cameras", "default", "rotated", "<object>"], "position", [d * 0.85, d * 0.75, d * 0.85]);
+  if (viewer.controls && viewer.controls.target) { viewer.controls.target.set(0, 0, 0); viewer.controls.update(); }
+  viewer.set_dirty();
+}
+function styleViewer() {
+  if (viewer.gui && viewer.gui.domElement) viewer.gui.domElement.style.display = guiShown ? "" : "none";
+}
+
+// Wait until MeshCat inside the frame has created its viewer and the number of
+// animation tracks has stopped changing (the file's commands load asynchronously).
+function waitForViewer(frame, timeoutMs) {
+  return new Promise((resolve) => {
+    const t0 = performance.now(); let lastCount = -1, stableSince = performance.now();
+    (function check() {
+      let v = null;
+      try { v = frame.contentWindow && frame.contentWindow.viewer; } catch (e) { return resolve(null); }
+      if (v && v.animator) {
+        const n = v.animator.actions.length;
+        if (n !== lastCount) { lastCount = n; stableSince = performance.now(); }
+        if (performance.now() - stableSince > (n > 0 ? 300 : 8000)) return resolve(v);
+      }
+      if (performance.now() - t0 > timeoutMs) return resolve(v || null);
+      setTimeout(check, 100);
+    })();
+  });
+}
+
+(async () => {
+  const v = await waitForViewer($("scene"), 120000);
+  if (!v) { $("overlay").textContent = "The animation file could not be displayed."; return; }
+  viewer = v; styleViewer(); fitView();
+  $("overlay").classList.add("hidden");
+  $("fit").disabled = false; $("gui").disabled = false;
+  const a = anim();
+  if (!a || !a.actions.length) {
+    $("time").textContent = "No recorded movement in this file (final scene only)";
+    return;
+  }
+  seek(0);
+  for (const id of ["play", "restart", "scrub", "speed"]) $(id).disabled = false;
+})();
+
+$("play").onclick = () => { const a = anim(); if (!a) return; if (a.playing) a.pause(); else { if (currentTime() >= duration() - 1e-3) seek(0); a.play(); } };
+$("restart").onclick = () => { const a = anim(); if (!a) return; seek(0); a.play(); };
+$("scrub").oninput = (e) => seek(duration() * e.target.value / 1000);
+$("speed").onchange = (e) => { const a = anim(); if (a) a.mixer.timeScale = parseFloat(e.target.value); };
+$("fit").onclick = fitView;
+$("gui").onclick = () => { guiShown = !guiShown; if (viewer) styleViewer(); $("gui").textContent = guiShown ? "Hide scene controls" : "Scene controls"; };
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

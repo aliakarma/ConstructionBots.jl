@@ -12,6 +12,7 @@ struct SimParameters
     save_anim_prog_path::String
     save_animation_along_the_way::Bool
     max_num_iters_no_progress::Int
+    dump_dir::Union{String,Nothing} # where a stuck run saves its variables for debugging (nothing: not saved)
 end
 
 mutable struct SimProcessingData
@@ -126,7 +127,7 @@ function simulate!(
            (length(update_steps) >= process_updates_interval || project_stop_bool)
 
             if block_save_anim
-                anim = ConstructionBots.AnimationWrapper(0)
+                anim = ConstructionBots.AnimationWrapper(factory_vis.vis, 0)
                 update_visualizer!(factory_vis)
                 settransform!(factory_vis.vis["/Cameras/default"], CoordinateTransformations.Translation(0, 0, 0))
                 setprop!(factory_vis.vis["/Cameras/default/rotated/<object>"], "position", CoordinateTransformations.Translation(0, 10, 0).translation)
@@ -191,20 +192,7 @@ function simulate!(
                 println("PROJECT COMPLETE!")
             else
                 println("PROJECT INCOMPLETE!")
-                var_dump_path = joinpath(dirname(pathof(ConstructionBots)), "..", "variable_dump")
-                mkpath(var_dump_path)
-                var_dump_path = joinpath(var_dump_path, "var_dump_$(sim_process_data.iter).jld2")
-                println("Dumping variables to $(var_dump_path)")
-                var_dict = Dict(
-                    "env" => env,
-                    "factory_vis" => factory_vis,
-                    "anim" => anim,
-                    "sim_params" => sim_params,
-                    "sim_process_data" => sim_process_data
-                )
-                print("\tSaving...")
-                JLD2.save(var_dump_path, var_dict)
-                print("done!\n")
+                sim_params.dump_dir === nothing || dump_variables(env, factory_vis, anim, sim_params, sim_process_data)
             end
         end
 
@@ -215,6 +203,24 @@ function simulate!(
     end
 
     return update_steps
+end
+
+"""Save a stuck run for scripts/debug_helper.jl. A failed dump must not cost the run's results."""
+function dump_variables(env, factory_vis, anim, sim_params, sim_process_data)
+    path = joinpath(sim_params.dump_dir, "var_dump_$(sim_process_data.iter).jld2")
+    println("Dumping variables to $path")
+    try
+        mkpath(sim_params.dump_dir)
+        JLD2.save(path, Dict(
+            "env" => env,
+            "factory_vis" => factory_vis,
+            "anim" => anim,
+            "sim_params" => sim_params,
+            "sim_process_data" => sim_process_data
+        ))
+    catch e
+        @warn "Could not save the debugging dump" exception = (e, catch_backtrace())
+    end
 end
 
 function save_animation!(visualizer, path)

@@ -2,7 +2,10 @@ struct AnimationWrapper
     anim::MeshCat.Animation
     step::Counter
 end
-AnimationWrapper(step::Int) = AnimationWrapper(MeshCat.Animation(MeshCat.Visualizer()), Counter(step))
+# The animation must live on the scene that gets saved, or the file holds no movement.
+AnimationWrapper(vis::MeshCat.Visualizer, step::Int) = AnimationWrapper(MeshCat.Animation(vis), Counter(step))
+# simulate! deep-copies visualizer handles to record them; a copy must still draw on the same scene.
+Base.deepcopy_internal(c::MeshCat.CoreVisualizer, ::IdDict) = c
 current_frame(a::AnimationWrapper) = get_counter_status(a.step)
 current_frame(::Nothing) = 0
 step_animation!(::Nothing, step=1) = nothing

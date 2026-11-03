@@ -9,6 +9,6 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/sisl/ConstructionBots.jl",
+    repo = "github.com/aliakarma/ConstructionBots.jl",
     versions = ["stable" => "v^", "v#.#"]
 )

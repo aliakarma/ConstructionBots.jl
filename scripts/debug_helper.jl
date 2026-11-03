@@ -8,9 +8,9 @@ This script can be used to load those "dumped" variables and continue the simula
 enabling you to step through the simuation or other debugging techniques.
 """
 
-dump_path = "variable_dump"
-dump_name = "var_dump_8850.jld2"
-file_dump_location = joinpath(dump_path, dump_name)
+# A stuck run saves its dump in <results_path>/variable_dump/. Pass that file as the first argument.
+isempty(ARGS) && error("usage: julia --project scripts/debug_helper.jl <path to var_dump_<step>.jld2>")
+file_dump_location = ARGS[1]
 
 # Load variables from file
 env = JLD2.load(file_dump_location, "env")
