@@ -196,8 +196,14 @@ cd dashboard
 
 These are unit and interface tests: settings validation, run records and CSV export, comparison logic, viewer-server
 path safety, engine queueing and ownership, and a render test of every page with Streamlit's AppTest. They use
-temporary folders and do not start Julia. The end-to-end simulator tests are described in the handoff report and were
-run against the real simulator.
+temporary folders and do not start Julia.
+
+`tests/test_real_simulation.py` runs real simulations through the real engine and worker, then renders the pages from
+those records. It needs Julia, the LDraw library and rvo2, and takes several minutes, so it runs only on request:
+
+```powershell
+$env:CONSTRUCTIONLAB_REAL_TESTS = "1"; .\.venv\Scripts\python.exe -m pytest tests/test_real_simulation.py
+```
 
 ## 10. Limitations
 

@@ -1,7 +1,7 @@
 # Paired comparison of assignment methods: the experiments behind any claim about them.
 #
 #   julia --project scripts/method_comparison.jl run --name NAME --models tractor,tie_fighter --seeds 1:30
-#   julia --project scripts/method_comparison.jl analyze results/experiments/NAME_<hash>.csv
+#   julia --project scripts/method_comparison.jl analyze results/experiments/NAME_<hash>.csv ["baseline label"]
 #
 # `run` options (comma-separated lists are crossed with each other):
 #   --models      keys of src/project_params.jl                  (default: tractor)
@@ -143,7 +143,7 @@ pfmt(x) = x === missing ? "—" : x < 0.001 ? "<0.001" : @sprintf("%.3f", x)
 mean_of(xs) = isempty(xs) ? missing : sum(xs) / length(xs)
 
 """Markdown tables per model: outcome and safety per method, gains against Greedy, plan-to-simulation correlation."""
-function analyze(path)
+function analyze(path, baseline="greedy")
     rows = read_rows(path)
     is_search(r) = split_method(r[:method])[1] in ConstructionBots.METAHEURISTIC_MODES
     label(r) = is_search(r) ? "$(r[:method]) $(r[:iterations])x$(r[:population])" : r[:method]
@@ -173,11 +173,11 @@ function analyze(path)
                     # with :top the simulator's figure covers only the final rerun, so it would mislead
                     occursin(":top", l) ? "—" : fmt(mean_of(collect(skipmissing(num(r, :assignment_time) for r in ok)))), " |")
         end
-        if haskey(times, "greedy") && length(labels) > 1
-            println("\nAgainst Greedy, seed by seed (positive gain = faster than Greedy):\n")
+        if haskey(times, baseline) && length(labels) > 1
+            println("\nAgainst $baseline, seed by seed (positive gain = faster than $baseline):\n")
             println("| Method | Pairs | Mean gain [s] (95 % CI) | dz | Wins / losses | p | p (Holm) |")
             println("|---|---|---|---|---|---|---|")
-            for (l, r) in paired_comparison(times["greedy"], [l => times[l] for l in labels if l != "greedy"])
+            for (l, r) in paired_comparison(times[baseline], [l => times[l] for l in labels if l != baseline])
                 println("| ", l, " | ", r.n, " | ", fmt(r.mean_gain), " (", fmt(r.ci_low), " to ", fmt(r.ci_high), ") | ",
                         fmt(r.effect_size), " | ", r.wins, " / ", r.losses, " | ", pfmt(r.p), " | ", pfmt(r.p_holm), " |")
             end
@@ -201,10 +201,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     mode = isempty(ARGS) ? "" : ARGS[1]
     if mode == "run"
         run_grid(parse_options(ARGS[2:end]))
-    elseif mode == "analyze" && length(ARGS) == 2
-        analyze(ARGS[2])
+    elseif mode == "analyze" && length(ARGS) in (2, 3)
+        analyze(ARGS[2:end]...)
     else
-        println("usage: julia --project scripts/method_comparison.jl run [options] | analyze <file.csv>")
+        println("usage: julia --project scripts/method_comparison.jl run [options] | analyze <file.csv> [baseline label]")
         exit(2)
     end
 end

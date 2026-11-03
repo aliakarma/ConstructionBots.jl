@@ -319,6 +319,9 @@ end
 progress while the main thread computes) and exits if the dashboard is gone.
 Uses Libc.systemsleep because the libuv event loop belongs to the busy main thread."""
 function supervisor_loop()
+    # PyCall objects are freed by GC finalizers, on whichever thread triggered the GC. Python may only ever run on the
+    # simulation's thread: otherwise it dies with "GC object already tracked" (exit code 0xC0000409, or a crash in python37.dll).
+    GC.enable_finalizers(false)
     last_parent_check = 0.0
     while true
         lock(FLUSH_LOCK)
