@@ -1,5 +1,4 @@
 planned = 14.875
-platform = "NT"
 
 [[tasks]]
 cargo = "part 17"

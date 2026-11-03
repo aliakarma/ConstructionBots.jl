@@ -68,15 +68,10 @@ let
     end
 
     @testset "Greedy is unchanged (saved assignment)" begin
-        # shortcut: floats from the layout solver can differ between platforms, so the saved plan is only
-        # compared on the platform that recorded it. Regenerate with test/fixtures/make_greedy_fixture.jl.
+        # Recorded on Windows; Linux gives the identical plan. Regenerate with test/fixtures/make_greedy_fixture.jl.
         fixture = TOML.parsefile(joinpath(@__DIR__, "fixtures", "greedy_tractor_seed1.toml"))
-        if fixture["platform"] == string(Sys.KERNEL)
-            @test greedy[:OptimisticMakespan] ≈ fixture["planned"]
-            @test [[p["cargo"], sort(p["robots"])] for p in greedy[:AssignmentPlan]] ==
-                  [[t["cargo"], t["robots"]] for t in fixture["tasks"]]
-        else
-            @info "Saved Greedy plan was recorded on $(fixture["platform"]); skipping exact comparison on $(Sys.KERNEL)."
-        end
+        @test greedy[:OptimisticMakespan] ≈ fixture["planned"]
+        @test [[p["cargo"], sort(p["robots"])] for p in greedy[:AssignmentPlan]] ==
+              [[t["cargo"], t["robots"]] for t in fixture["tasks"]]
     end
 end

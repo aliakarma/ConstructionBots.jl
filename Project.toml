@@ -75,7 +75,9 @@ TOML = "1"
 julia = "1.10"
 
 [extras]
+Base64 = "2a0f44e3-6c83-55bd-87e4-b1978be4d52f"
+Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Base64", "Sockets", "Test"]
