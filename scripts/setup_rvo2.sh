@@ -23,6 +23,6 @@ fi
 if [ ! -d "$ldraw_dir/parts" ]; then
     mkdir -p "$(dirname "$ldraw_dir")"
     curl -fsSL https://library.ldraw.org/library/updates/complete.zip -o "$src_dir/ldraw.zip"
-    unzip -q "$src_dir/ldraw.zip" -d "$(dirname "$ldraw_dir")"
+    python -m zipfile -e "$src_dir/ldraw.zip" "$(dirname "$ldraw_dir")"
 fi
 rm -rf "$src_dir"

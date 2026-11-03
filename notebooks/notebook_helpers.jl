@@ -899,6 +899,8 @@ function run_experiment(cfg::ExperimentConfig; batch_id=missing, verbose::Bool=t
         rec[:git_commit] = string(get(stats, :GitCommit, "unknown"), get(stats, :GitDirty, false) ? "+dirty" : "")
         rec[:search_kept_greedy] = get(stats, :SearchKeptGreedy, missing)
         rec[:selected_plan] = get(stats, :SelectedPlan, missing)
+        # The simulator's figure covers only the final rerun of the chosen plan; the total time covers all of it.
+        v.simulate_top_plans > 0 && (rec[:assignment_time_s] = missing)
         rec[:top_plan_makespans] = get(stats, :TopPlanMakespans, missing)
         rec[:pre_execution_runtime_s] = _finite(get(stats, :PreExecutionRuntime, missing))
         rec[:execution_runtime_s] = _finite(get(stats, :ExecutionRuntime, missing))
@@ -1233,6 +1235,7 @@ _fmt(x::Bool) = x ? "on" : "off"
 _fmt(x::AbstractFloat) = isfinite(x) ? (abs(x) >= 100 ? @sprintf("%.1f", x) : @sprintf("%.2f", x)) : "—"
 _fmt(x) = string(x)
 _unit(x, u) = x === missing ? "—" : string(_fmt(x), " ", u)
+_gap(x) = x === missing ? "—" : @sprintf("%.3f m", x)   # a gap of -0.004 m is an overlap: two decimals would hide it
 
 function _display_table(header, rows; title=nothing, note=nothing)
     if _in_notebook()
@@ -1307,7 +1310,7 @@ function show_run(rec)
         ["Completion time (makespan)", _unit(rec[:makespan_s], "s"), "SIMULATED time until the model was fully built"],
         ["Planned completion time", _unit(rec[:optimistic_makespan_s], "s"),
          "SIMULATED; the schedule's estimate after assignment, ignoring traffic (\"OptimisticMakespan\")"],
-        ["Smallest gap between robots", _unit(rec[:robot_min_gap_m], "m"),
+        ["Smallest gap between robots", _gap(rec[:robot_min_gap_m]),
          "SAFETY; the closest two free robots came, surface to surface. Negative means they overlapped"],
         ["Steps with overlapping robots", _fmt(rec[:robot_overlap_steps]),
          "SAFETY; $(_fmt(rec[:overlap_steps])) when transport teams count too (as bounding circles, so conservative)"],
@@ -1635,7 +1638,7 @@ function chart_convergence(records; title="Search progress: best planned complet
         print(io, """<text x="$(x(i))" y="$(top+ph+16)" text-anchor="middle" fill="#444">$i</text>""")
     end
     print(io, """<line x1="$left" x2="$(left+pw)" y1="$(top+ph)" y2="$(top+ph)" stroke="#222"/>""",
-          """<text x="$(left+pw/2)" y="$(H-12)" text-anchor="middle" fill="#222">iteration (0 = start: Greedy's task order)</text>""",
+          """<text x="$(left+pw/2)" y="$(H-12)" text-anchor="middle" fill="#222">iteration (0 = start: Greedy and its task order)</text>""",
           """<text transform="translate(18,$(top+ph/2)) rotate(-90)" text-anchor="middle" fill="#222">planned completion [simulated s]</text>""")
     legend = Tuple{String,String,String}[]
     for (l, v, c) in refs

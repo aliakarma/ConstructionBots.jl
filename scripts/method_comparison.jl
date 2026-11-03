@@ -170,7 +170,8 @@ function analyze(path)
                     count(r -> something(tryparse(Int, r[:robot_overlap_steps]), 0) > 0, ok), " | ",
                     isempty(gaps) ? "—" : fmt(minimum(gaps), 3), " | ",
                     sum((something(tryparse(Int, r[:swaps]), 0) for r in ok); init=0), " | ",
-                    fmt(mean_of(collect(skipmissing(num(r, :assignment_time) for r in ok)))), " |")
+                    # with :top the simulator's figure covers only the final rerun, so it would mislead
+                    occursin(":top", l) ? "—" : fmt(mean_of(collect(skipmissing(num(r, :assignment_time) for r in ok)))), " |")
         end
         if haskey(times, "greedy") && length(labels) > 1
             println("\nAgainst Greedy, seed by seed (positive gain = faster than Greedy):\n")
