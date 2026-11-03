@@ -8,7 +8,8 @@ env_name="${1:-lego_rvo2}"
 ldraw_dir="${LDRAW_DIR:-$HOME/Documents/ldraw}"
 
 eval "$(conda shell.bash hook)"
-conda env list | grep -q "^$env_name " || conda create -y -n "$env_name" python=3.7
+# conda-forge explicitly: the default channels refuse non-interactive use until their terms are accepted
+conda env list | grep -q "^$env_name " || conda create -y -n "$env_name" --override-channels -c conda-forge python=3.7 pip
 conda activate "$env_name"
 pip install cython==0.29.36
 src_dir="$(mktemp -d)"
