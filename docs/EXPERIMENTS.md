@@ -133,7 +133,7 @@ Greedy runs that finish on this machine:
 | Passenger Plane | 326 | 50 | 1 | 230.93 | 173.95 | 773 |
 | Imperial Star Destroyer | 418 | 75 | 1 | 158.95 | 106.90 | 1,225 |
 
-@@KINGS_NOTE@@ These runs show that large models can finish. They are not a comparison of methods.
+A King's Castle run (761 parts) was still simulating after 30 minutes, at 3,376 of 7,456 schedule tasks, so it is not reported. These runs show that large models can finish. They are not a comparison of methods.
 
 **The dashboard's crash is fixed.** Runs in the dashboard engine died with exit code 0xC0000409 or a crash in `python37.dll`. The log shows why: `Fatal Python error: GC object already tracked`. The engine has a helper thread for flushing logs. A garbage collection it triggered could run PyCall's finalizers on that thread, while the simulation thread was inside Python. The helper thread now never runs finalizers. Before the fix, a real engine test lost 4 of its 5 simulation runs on the Tractor. After the fix, the same test passed on each repeat. This is a fix to the dashboard's worker: the notebook and scripts run with one thread and do not have this problem, but anyone starting extra Julia threads alongside a simulation should keep this in mind.
 
@@ -143,7 +143,7 @@ One experiment process stopped without any message (exit code 127) while the mac
 
 - **The planned 30 seeds on the medium models.** X-Wing mini reached 18 complete seeds, Imperial Shuttle 12 and AT-TE Walker 7.
 - **Methods on large models.** Only Greedy, plus one warm-start run on X-Wing, which did not improve on Greedy in 120 s.
-- **The largest models** @@LARGEST_NOTE@@
+- **The largest models.** King's Castle did not finish within this session, and AT-AT, Heavily Nested and Saturn V (1,105 to 1,845 parts) were not attempted.
 - **Equal wall-clock budgets.** Methods got equal evaluation budgets instead, and assignment times differ.
 - **Any real-robot validation.** Velocity changes are instant by default, robots can swap positions, and scale is not physically consistent across models, so completion times are comparable only within one model.
 

@@ -119,7 +119,7 @@ julia --project scripts/method_comparison.jl analyze results/experiments/mine_<h
 julia --project -e 'using Pkg; Pkg.test()'                                                   # Julia test suite
 cd dashboard && python -m pytest                                                             # dashboard test suite
 ```
-See [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) for the experiments run so far and how to reproduce them.
+See [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) for the experiments run so far and how to reproduce them, and [`docs/AUDIT_STATUS.md`](docs/AUDIT_STATUS.md) for the known limitations left after the forensic audit.
 
 ### Images from the Tractor Project
 ![Tractor Project a](media/tractor_demo_a.png)

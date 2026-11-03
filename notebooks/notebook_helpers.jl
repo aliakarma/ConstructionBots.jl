@@ -1357,7 +1357,9 @@ const _TABLE_COLS = [
 """Show many runs as one table (one row per run, failures included)."""
 function show_results(records; title="Results")
     _display_table([c[2] for c in _TABLE_COLS],
-        [[c[1] == :status ? uppercase(string(r[c[1]])) : get(r, c[1], missing) for c in _TABLE_COLS] for r in records];
+        [[c[1] == :status ? uppercase(string(r[c[1]])) :
+          c[1] == :robot_min_gap_m && get(r, c[1], missing) !== missing ? @sprintf("%.3f", r[c[1]]) :
+          get(r, c[1], missing) for c in _TABLE_COLS] for r in records];
         title=title,
         note="sim s = simulated seconds (robot time).  cpu s = real seconds of computer time.  Robot gap < 0 means " *
              "two robots overlapped; a faster time with overlaps is not a better result.  " *
