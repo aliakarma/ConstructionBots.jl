@@ -1,0 +1,2 @@
+model,method,seed,robots,iterations,population,placement,time_limit,solver,movement,status,makespan,planned,robot_min_gap,robot_overlap_steps,min_gap,overlap_steps,swaps,max_speed,assignment_time,execution_time,evaluations,timed_out,kept_greedy,termination,gap,bound,source_hash,git_commit
+kings_castle,greedy,1,125,25,16,0,120,highs,1+1+1,success,238.8,198.45,-0.05877943417474135,13,-1.1846997996912596,1365,0,4.128360379590097,44.486000061035156,2425.1180000305176,,,,,,,1ce4205b64cd,e6011a5

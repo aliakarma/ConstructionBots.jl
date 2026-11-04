@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ConstructionLab viewer</title>
+<style>
+  :root {
+    --bg: #EDF1EE; --surface: #FFFFFF; --text: #202A32; --muted: #687581; --navy: #17324D;
+    --teal: #147D83; --slate: #456A8A; --amber: #9A6418; --green: #267653; --red: #B54747; --border: #DDE2E4;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #F5F5F2; color: var(--text);
+    font: 14px/1.4 Inter, "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  .shell { display: flex; flex-direction: column; height: 100%; }
+  .stage { position: relative; flex: 1 1 auto; min-height: 240px; border: 1px solid var(--border); border-bottom: 0;
+    border-radius: 6px 6px 0 0; overflow: hidden; background: linear-gradient(#F5F5F2, #D9DFE1); }
+  iframe#scene, iframe#sceneB { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  /* The back buffer keeps its full size (a display:none frame would give MeshCat a 0x0 canvas). */
+  iframe.buffer { visibility: hidden; z-index: 0; }
+  iframe.front { z-index: 1; }
+  .upd { color: var(--muted); font-style: italic; }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px;
+    text-align: center; color: var(--muted); background: linear-gradient(#F5F5F2, #E3E8E9); }
+  .overlay .box { max-width: 460px; }
+  .overlay h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--text); }
+  .overlay p { margin: 0; }
+  .hidden { display: none !important; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 0 0 6px 6px; }
+  button, select, .linkbtn { font: inherit; font-size: 13px; color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 5px; padding: 4px 10px; cursor: pointer; text-decoration: none;
+    line-height: 20px; }
+  button:hover, select:hover, .linkbtn:hover { border-color: var(--slate); }
+  button:focus-visible, select:focus-visible, input:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+  button.primary { background: var(--teal); border-color: var(--teal); color: #fff; min-width: 64px; }
+  button:disabled { opacity: .45; cursor: default; }
+  input[type=range] { flex: 1 1 160px; min-width: 120px; accent-color: var(--teal); }
+  .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; min-width: 150px; }
+  .spacer { flex: 1 1 auto; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 2px 0; color: var(--muted); font-size: 12px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 500; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .pill.live .dot { background: var(--amber); }
+  .pill.replay .dot { background: var(--teal); }
+  .pill.wait .dot { background: var(--muted); }
+  label.chk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="stage" id="stage">
+    <iframe id="scene" title="3D simulation viewer" class="hidden"></iframe>
+    <iframe id="sceneB" title="3D simulation viewer (next snapshot)" class="hidden" tabindex="-1"></iframe>
+    <div class="overlay" id="overlay" role="status" aria-live="polite"><div class="box"><h2 id="ov-title">Loading viewer</h2><p id="ov-text"></p></div></div>
+  </div>
+  <div class="bar" role="toolbar" aria-label="Playback controls">
+    <button id="play" class="primary" disabled>Play</button>
+    <button id="restart" disabled>Restart</button>
+    <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Playback position" disabled>
+    <span class="time" id="time">–</span>
+    <select id="speed" aria-label="Playback speed" disabled>
+      <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option>
+      <option value="2">2×</option><option value="4">4×</option>
+    </select>
+    <label class="chk hidden" id="follow-wrap"><input type="checkbox" id="follow" checked> Follow latest</label>
+    <span class="spacer"></span>
+    <button id="fit" disabled title="Frame the whole construction site">Reset view</button>
+    <button id="gui" disabled title="Show MeshCat's own scene controls (layers, camera, background)">Scene controls</button>
+    <button id="full" title="Full screen">Full screen</button>
+    <a class="linkbtn" id="newtab" target="_blank" rel="noopener" href="#">Open in new tab</a>
+  </div>
+  <div class="meta"><span class="pill wait" id="mode"><span class="dot"></span><span id="mode-text">Waiting</span></span><span id="desc"></span><span class="upd hidden" id="updating">· loading a newer snapshot…</span></div>
+</div>
+<script>
+"use strict";
+const RUN_ID = __RUN_ID__;
+const API = "/api/runs/" + encodeURIComponent(RUN_ID) + "/viewer";
+const FPS = 30;
+const $ = (id) => document.getElementById(id);
+// Two frames: the visible one keeps showing the current scene while the next snapshot loads in the other.
+const frames = [$("scene"), $("sceneB")];
+let active = 0;
+let state = null, current = null, viewer = null, loading = false, guiShown = false, fitted = false;
+
+$("newtab").href = location.href;
+if (!document.fullscreenEnabled) { $("full").classList.add("hidden"); }
+
+function overlay(title, text) {
+  $("ov-title").textContent = title; $("ov-text").textContent = text || "";
+  $("overlay").classList.remove("hidden");
+}
+function hideOverlay() { $("overlay").classList.add("hidden"); }
+function setMode(kind, text) {
+  const m = $("mode"); m.className = "pill " + kind; $("mode-text").textContent = text;
+}
+function enableControls(on) {
+  for (const id of ["play", "restart", "scrub", "speed", "fit", "gui"]) $(id).disabled = !on;
+}
+function anim() { return viewer && viewer.animator; }
+function duration() { const a = anim(); return a ? a.duration || 0 : 0; }
+function currentTime() {
+  const a = anim(); if (!a || !a.actions.length) return 0;
+  return a.actions.reduce((m, x) => Math.max(m, x.time), 0);
+}
+function seek(t) {
+  const a = anim(); if (!a || !a.actions.length) return;
+  const wasPlaying = a.playing;
+  if (!wasPlaying) { a.play(); a.seek(t); a.pause(); } else { a.seek(t); }
+}
+function fmt(s) { return (Math.round(s * 10) / 10).toFixed(1); }
+
+function describeTime(t) {
+  const d = duration();
+  let s = fmt(t) + " / " + fmt(d) + " s";
+  if (state && state.final && current && current.kind === "final" && state.sim_steps && state.sim_time_step_s) {
+    const start = d * FPS - state.sim_steps;
+    const f = t * FPS;
+    s = f < start ? "Build-plan preview · " + s
+                  : "Simulated ≈ " + fmt(Math.min(state.sim_steps, f - start) * state.sim_time_step_s) + " / " +
+                    fmt(state.sim_steps * state.sim_time_step_s) + " s";
+  }
+  return s;
+}
+
+function tick() {
+  const a = anim();
+  if (a && a.actions.length) {
+    const t = currentTime(), d = duration();
+    if (document.activeElement !== $("scrub")) $("scrub").value = d > 0 ? Math.round(1000 * t / d) : 0;
+    $("time").textContent = describeTime(t);
+    $("play").textContent = a.playing ? "Pause" : "Play";
+  }
+  requestAnimationFrame(tick);
+}
+
+// Size of the working area: 95th percentile of the distances of all animated positions from
+// the origin (robots parked far away at the end do not dominate). Falls back to visible meshes.
+function sceneRadius() {
+  const ds = []; const a = anim();
+  if (a) for (const act of a.actions) for (const tr of act._clip.tracks) {
+    if (!tr.name.endsWith(".position")) continue;
+    const v = tr.values; for (let i = 0; i + 2 < v.length; i += 3) ds.push(Math.hypot(v[i], v[i + 1], v[i + 2]));
+  }
+  if (ds.length) { ds.sort((x, y) => x - y); return ds[Math.floor(0.85 * (ds.length - 1))]; }
+  const V = viewer.camera.position.constructor; const w = new V(); let r = 0;
+  viewer.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    for (let p = o; p; p = p.parent) if (!p.visible) return;
+    o.getWorldPosition(w); const d = Math.hypot(w.x, w.y, w.z); if (isFinite(d)) r = Math.max(r, d);
+  });
+  return r;
+}
+
+function fitView() {
+  if (!viewer) return;
+  let r = sceneRadius();
+  if (!(r > 0)) r = 3;
+  const d = Math.max(0.6, r * 0.95);
+  viewer.set_property(["Cameras", "default", "rotated", "<object>"], "position", [d * 0.85, d * 0.75, d * 0.85]);
+  if (viewer.controls && viewer.controls.target) { viewer.controls.target.set(0, 0, 0); viewer.controls.update(); }
+  viewer.set_dirty();
+}
+
+function captureCamera() {
+  if (!viewer || !viewer.camera) return null;
+  return { p: viewer.camera.position.toArray(), t: viewer.controls ? viewer.controls.target.toArray() : null };
+}
+function restoreCamera(c) {
+  if (!c || !viewer) return false;
+  viewer.camera.position.fromArray(c.p);
+  if (c.t && viewer.controls) { viewer.controls.target.fromArray(c.t); viewer.controls.update(); }
+  viewer.set_dirty(); return true;
+}
+
+function styleViewer() {
+  viewer.set_property(["Background", "<object>"], "top_color", [0.961, 0.961, 0.949]);
+  viewer.set_property(["Background", "<object>"], "bottom_color", [0.835, 0.859, 0.867]);
+  if (viewer.gui && viewer.gui.domElement) viewer.gui.domElement.style.display = guiShown ? "" : "none";
+}
+
+function waitForViewer(frame, timeoutMs) {
+  return new Promise((resolve) => {
+    const t0 = performance.now(); let lastCount = -1, stableSince = performance.now();
+    (function check() {
+      let v = null;
+      try { const w = frame.contentWindow; v = w && w.viewer; }
+      catch (e) { return resolve(null); }   // the browser refused to show the file in this frame
+      if (v && v.animator) {
+        const n = v.animator.actions.length;
+        if (n !== lastCount) { lastCount = n; stableSince = performance.now(); }
+        if (n > 0 && performance.now() - stableSince > 300) return resolve(v);
+      }
+      if (performance.now() - t0 > timeoutMs) return resolve(v || null);
+      setTimeout(check, 100);
+    })();
+  });
+}
+
+async function load(target) {
+  loading = true;
+  const first = !viewer;
+  const cam = fitted ? captureCamera() : null;
+  const next = first ? frames[active] : frames[1 - active];
+  if (first) {
+    enableControls(false);
+    overlay(target.kind === "final" ? "Loading the saved animation" : "Loading live snapshot",
+            target.size_mb ? target.size_mb.toFixed(1) + " MB" : "");
+    next.classList.remove("hidden"); next.classList.add("front");
+  } else {
+    $("updating").classList.remove("hidden");
+    next.classList.remove("hidden"); next.classList.add("buffer");
+  }
+  next.src = target.url;
+  await new Promise((res) => { next.onload = res; });
+  const v = await waitForViewer(next, 30000);
+  $("updating").classList.add("hidden");
+  if (!v) {
+    if (first) overlay("The viewer did not start", "The animation file could not be displayed in this browser.");
+    else { next.classList.add("hidden"); next.src = "about:blank"; }
+    loading = false; return;
+  }
+  if (!first) {   // swap buffers: show the new scene, release the old one
+    const prev = frames[active];
+    next.classList.remove("buffer"); next.classList.add("front");
+    prev.classList.remove("front"); prev.classList.add("hidden"); prev.src = "about:blank";
+    active = 1 - active;
+  }
+  viewer = v;
+  current = target;
+  styleViewer();
+  if (!restoreCamera(cam)) { fitView(); fitted = true; }
+  const a = anim();
+  if (!a || !a.actions.length) {
+    hideOverlay(); enableControls(false); $("fit").disabled = false; $("gui").disabled = false;
+    $("time").textContent = "No recorded motion in this file";
+    setMode("wait", "Static scene");
+    $("desc").textContent = "This file contains the final scene but no animation track (files saved before the " +
+      "dashboard's recording fix look like this).";
+    loading = false; return;
+  }
+  a.mixer.timeScale = parseFloat($("speed").value);
+  if (target.kind === "snapshot" && $("follow").checked) { seek(duration()); }
+  else { seek(0); }
+  hideOverlay(); enableControls(true); loading = false;
+  renderMeta();
+}
+
+function renderMeta() {
+  if (!state) return;
+  const live = current && current.kind === "snapshot";
+  $("follow-wrap").classList.toggle("hidden", !live);
+  if (current && current.kind === "final") setMode("replay", "Replay");
+  else if (live) setMode("live", "Live preview");
+  else setMode("wait", state.state_label);
+  let d = state.model_name + " · " + state.run_id;
+  if (live) {
+    d += " · snapshot at simulation step " + (current.step === null ? "0 (build plan)" : current.step) +
+         " · " + (state.progress && state.progress.phase ? state.progress.phase : "running");
+  } else if (state.state !== "success" && state.is_final) {
+    d += " · " + state.state_label;
+  }
+  $("desc").textContent = d;
+}
+
+async function poll() {
+  let next = 2000;
+  try {
+    const r = await fetch(API, { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    state = await r.json();
+    let target = null;
+    if (state.final) target = Object.assign({ kind: "final" }, state.final);
+    else if (state.snapshots.length) target = Object.assign({ kind: "snapshot" }, state.snapshots[state.snapshots.length - 1]);
+    if (target && (!current || current.url !== target.url) && !loading) {
+      await load(target);
+    } else if (!target && !current) {
+      frames.forEach((f) => f.classList.add("hidden"));
+      if (!state.animation_enabled) {
+        overlay("3D animation was not recorded for this run", "Turn on “Save 3D animation” in the settings to watch future runs.");
+        setMode("wait", state.state_label);
+      } else if (state.state === "queued") {
+        overlay("Queued", "Waiting for the simulation engine to start this run."); setMode("wait", "Queued");
+      } else if (state.state === "running") {
+        const ph = state.progress && state.progress.phase ? state.progress.phase : "Running";
+        overlay(ph, state.live_enabled
+          ? "The live preview appears after task assignment, when the simulator saves its first animation snapshot."
+          : "Live preview is off for this run; the animation appears when the run finishes.");
+        setMode("live", "Running");
+      } else {
+        overlay("No animation for this run", "The run ended with status “" + state.state_label + "” before an animation was saved.");
+        setMode("wait", state.state_label);
+      }
+      $("desc").textContent = state.model_name + " · " + state.run_id;
+    }
+    renderMeta();
+    if (state.is_final) next = 0;   // all files are written before the final status
+  } catch (e) {
+    if (!current) overlay("Viewer server not reachable", "Reload the dashboard page. (" + e.message + ")");
+    next = 4000;
+  }
+  if (next) setTimeout(poll, next);
+}
+
+$("play").onclick = () => { const a = anim(); if (!a) return; if (a.playing) a.pause(); else { if (currentTime() >= duration() - 1e-3) seek(0); a.play(); } };
+$("restart").onclick = () => { const a = anim(); if (!a) return; seek(0); a.play(); };
+$("scrub").oninput = (e) => { $("follow").checked = false; seek(duration() * e.target.value / 1000); };
+$("speed").onchange = (e) => { const a = anim(); if (a) a.mixer.timeScale = parseFloat(e.target.value); };
+$("fit").onclick = fitView;
+$("gui").onclick = () => { guiShown = !guiShown; if (viewer) styleViewer(); $("gui").textContent = guiShown ? "Hide scene controls" : "Scene controls"; };
+$("full").onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => window.open(location.href, "_blank")); };
+$("follow").onchange = (e) => { if (e.target.checked) seek(duration()); };
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !["INPUT", "SELECT", "BUTTON", "A"].includes(document.activeElement.tagName)) { e.preventDefault(); $("play").click(); }
+});
+requestAnimationFrame(tick);
+poll();
+</script>
+</body>
+</html>

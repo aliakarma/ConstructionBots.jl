@@ -1,0 +1,54 @@
+# ConstructionLab: Streamlit settings. Start the app from the dashboard folder so this file is used.
+
+[server]
+address = "localhost"          # local research tool: not reachable from other computers
+headless = true
+runOnSave = false
+enableXsrfProtection = true
+maxUploadSize = 1
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = "type"
+
+[runner]
+fastReruns = true
+
+[theme]
+base = "light"
+primaryColor = "#147D83"
+backgroundColor = "#F5F5F2"
+secondaryBackgroundColor = "#EDF1EE"
+textColor = "#202A32"
+linkColor = "#456A8A"
+borderColor = "#DDE2E4"
+dataframeBorderColor = "#DDE2E4"
+dataframeHeaderBackgroundColor = "#EDF1EE"
+showWidgetBorder = true
+baseRadius = "6px"
+buttonRadius = "6px"
+baseFontSize = 15
+font = "Inter, 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif"
+headingFont = "Inter, 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif"
+headingFontWeights = [650, 600, 600, 600, 600, 600]
+headingFontSizes = ["1.65rem", "1.25rem", "1.05rem", "1rem", "0.95rem", "0.9rem"]
+redColor = "#B54747"
+greenColor = "#267653"
+orangeColor = "#9A6418"
+yellowColor = "#C88A43"
+blueColor = "#456A8A"
+violetColor = "#5B5F8F"
+grayColor = "#687581"
+chartCategoricalColors = ["#2E6DA4", "#D08A35", "#1A9E80", "#8E4673"]
+
+[theme.sidebar]
+backgroundColor = "#17324D"
+secondaryBackgroundColor = "#1E3D5C"
+textColor = "#E6ECF1"
+primaryColor = "#7CC3C6"
+borderColor = "#2C4A68"
+linkColor = "#B9D7E8"

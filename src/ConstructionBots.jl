@@ -25,6 +25,7 @@ using StatsBase
 using JLD2
 using ProgressMeter
 using TOML
+using SHA
 using PyCall
 using LDrawParser
 using Colors
@@ -41,17 +42,44 @@ using Compose
 
 
 include("graph_utils_essentials.jl")
-include("essential_tg_coponents.jl")
+include("essential_tg_components.jl")
 include("hierarchical_geom_essentials.jl")
 include("construction_schedule.jl")
 include("rvo_interface.jl")
 include("task_assignment.jl")
+include("assignment_algorithms.jl")
 include("route_planning.jl")
 include("graph_plotting.jl")
 include("render_tools.jl")
 include("demo_utils.jl")
 include("project_params.jl")
+include("comparison_statistics.jl")
 include("full_demo.jl")
+
+# Identifies the code that produced a result: the source files this package was compiled from and the
+# exact package versions. Line endings are normalized, so a checkout gets the same hash on any OS.
+const SOURCE_HASH = let
+    files = [joinpath(@__DIR__, f) for f in sort(readdir(@__DIR__)) if endswith(f, ".jl")]
+    manifest = joinpath(@__DIR__, "..", "Manifest.toml")
+    if isfile(manifest)
+        include_dependency(manifest)
+        push!(files, manifest)
+    end
+    bytes2hex(SHA.sha1(join(replace(read(f, String), "\r\n" => "\n") for f in files)))[1:12]
+end
+
+function code_version()
+    root = joinpath(@__DIR__, "..")
+    git(args...) = try
+        readchomp(pipeline(`git -C $root $args`; stderr=devnull))
+    catch
+        ""
+    end
+    commit = git("rev-parse", "--short", "HEAD")
+    dirty = git("status", "--porcelain", "--", "src", "Project.toml", "Manifest.toml")
+    return Dict(:SourceHash => SOURCE_HASH, :GitCommit => isempty(commit) ? "unknown" : commit,
+                :GitDirty => !isempty(dirty), :JuliaVersion => string(VERSION))
+end
 
 
 ################################################################################

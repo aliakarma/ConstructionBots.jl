@@ -1,0 +1,2 @@
+model,method,seed,robots,iterations,population,placement,time_limit,solver,movement,status,makespan,planned,robot_min_gap,robot_overlap_steps,min_gap,overlap_steps,swaps,max_speed,assignment_time,execution_time,evaluations,timed_out,kept_greedy,termination,gap,bound,source_hash,git_commit
+passenger_plane,greedy,1,50,25,16,0,120,highs,1+1+1,success,230.925,173.95000000000007,-0.04537266978442839,8,-0.6725063035467824,1126,0,4.00005523922171,19.461999893188477,773.1689999103546,,,,,,,1ce4205b64cd,a854522

@@ -58,6 +58,17 @@ end
 Base.summary(id::A) where {A<:AbstractID} = string(string(A), "(", get_id(id), ")")
 Base.string(id::A) where {A<:AbstractID} = summary(id)
 
+# Julia's default hash of a struct mixes in its module's build id, so the iteration order of every
+# Dict/Set keyed by IDs (and with it the schedule) changed whenever the package was recompiled.
+# Hashing the type's name instead makes results independent of the build.
+const ID_TYPE_HASHES = IdDict{DataType,UInt}()
+stable_type_name(T) = sprint(show, T; context=:module => @__MODULE__)
+id_type_hash(T::DataType) = get!(() -> hash(stable_type_name(T)), ID_TYPE_HASHES, T)
+Base.hash(id::AbstractID, h::UInt) = hash(get_id(id), xor(id_type_hash(typeof(id)), h))
+
+"""Sort key for IDs that does not depend on hashes, on the build, or on what is imported in Main."""
+stable_id_key(id::AbstractID) = (stable_type_name(typeof(id)), get_id(id))
+
 mutable struct Toggle
     status::Bool
 end
@@ -78,6 +89,16 @@ end
 
 get_counter_status(t::Counter) = copy(t.status)
 
+# Cached transforms are compared with a strict `>` on these stamps (cached_node_up_to_date). time()
+# only advances every millisecond on Windows, so equal stamps made the scene-tree code recurse until
+# StackOverflowError.
+const LAST_TIME_STAMP = Ref(0.0)
+function next_time_stamp()
+    t = max(time(), nextfloat(LAST_TIME_STAMP[]))
+    LAST_TIME_STAMP[] = t
+    return t
+end
+
 """
     CachedElement{E}
 
@@ -88,7 +109,7 @@ mutable struct CachedElement{E}
     is_up_to_date::Bool
     timestamp::Float64
 end
-CachedElement(element, flag) = CachedElement(element, flag, time())
+CachedElement(element, flag) = CachedElement(element, flag, next_time_stamp())
 CachedElement(element) = CachedElement(element, false)
 
 """
@@ -190,11 +211,11 @@ function set_element!(n::CachedElement, g)
     n.element = g
 end
 """
-    set_time_stamp!(n::CachedElement,t=time())
+    set_time_stamp!(n::CachedElement,t=next_time_stamp())
 
 Set the time stamp of n.
 """
-function set_time_stamp!(n::CachedElement, t=time())
+function set_time_stamp!(n::CachedElement, t=next_time_stamp())
 
     n.timestamp = t
 end
@@ -217,9 +238,9 @@ end
 Shares the e.element, since it doesn't need to be replaced until `set_element!`
 is called. Copies `e.is_up_to_date` to preserve the cache state.
 """
-Base.copy(e::CachedElement) = CachedElement(e.element, copy(is_up_to_date(e)), time())
+Base.copy(e::CachedElement) = CachedElement(e.element, copy(is_up_to_date(e)), next_time_stamp())
 
-Base.convert(::Type{CachedElement{T}}, e::CachedElement) where {T} = CachedElement{T}(get_element(e), is_up_to_date(e), time())
+Base.convert(::Type{CachedElement{T}}, e::CachedElement) where {T} = CachedElement{T}(get_element(e), is_up_to_date(e), next_time_stamp())
 
 const cached_element_accessor_interface = [:is_up_to_date, :time_stamp]
 const cached_element_mutator_interface = [:update_element!, :set_time_stamp!, :set_element!, :set_up_to_date!]

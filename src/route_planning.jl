@@ -90,6 +90,30 @@ function integrate_twist(twist, dt)
 end
 
 """
+    SafetyMetrics
+
+What the makespan cannot see, accumulated every time step by `step_environment!`. Lengths are in
+meters, speeds in meters per simulated second. A gap is the distance between two agents' surfaces,
+so a negative gap means they overlap.
+
+- `robot_min_gap`, `robot_overlap_steps`: free robots against free robots (their true cylinders).
+- `min_gap`, `overlap_steps`: all free robots and formed transport units (transport units are
+  bounding circles, so this one is conservative).
+- `swaps`: position swaps, which teleport two robots (`swap_carrying_positions!`).
+- `max_speed`: fastest agent, leaving out the teleport of a swap.
+"""
+@with_kw mutable struct SafetyMetrics
+    robot_min_gap::Float64 = Inf
+    robot_overlap_steps::Int = 0
+    min_gap::Float64 = Inf
+    overlap_steps::Int = 0
+    swaps::Int = 0
+    max_speed::Float64 = 0.0
+    positions::Dict{AbstractID,SVector{2,Float64}} = Dict{AbstractID,SVector{2,Float64}}()
+    candidates::Vector{Any} = Any[] # robots and transport units, filled on the first step
+end
+
+"""
     PlannerEnv
 
 Contains the Environment state and definition.
@@ -106,6 +130,8 @@ Contains the Environment state and definition.
     staging_buffers::Dict{AbstractID,Float64} = Dict{AbstractID,Float64}() # dynamic buffer for staging areas
     max_robot_go_id::Int64 = Inf
     max_cargo_id::Int64 = Inf
+    safety::SafetyMetrics = SafetyMetrics()
+    commanded_velocity::Dict{AbstractID,SVector{3,Float64}} = Dict{AbstractID,SVector{3,Float64}}()
 end
 
 node_is_active(env, node) = get_vtx(env.sched, node_id(node)) in env.cache.active_set
@@ -190,6 +216,13 @@ end
 The max rotational velocity with which a part may be loaded (e.g., by
 LiftIntoPlace,FormTransportUnit,DepositCargo)
 """
+global MAX_ACCELERATION = Inf
+"""Limit on how fast an agent's commanded velocity may change [m/s^2]. `Inf`: instant velocity changes."""
+max_acceleration() = MAX_ACCELERATION
+function set_max_acceleration!(val::Float64)
+    global MAX_ACCELERATION = val
+end
+
 global ROTATIONAL_LOADING_SPEED = 0.1
 default_rotational_loading_speed() = ROTATIONAL_LOADING_SPEED
 function set_default_rotational_loading_speed!(val::Float64)
@@ -275,6 +308,7 @@ function step_environment!(env::PlannerEnv, sim=rvo_global_sim())
 
     # swap transport unit positions if necessary
     swap_first_paralyzed_transport_unit!(env, prev_active_pos_dict)
+    update_safety_metrics!(env)
 
     # Set velocities to zero for all agents. The pref velocities are only overwritten if
     # agent is "active" in the next time step
@@ -284,6 +318,41 @@ function step_environment!(env::PlannerEnv, sim=rvo_global_sim())
     return env
 end
 
+
+function update_safety_metrics!(env::PlannerEnv)
+    @unpack scene_tree, safety, dt = env
+    if isempty(safety.candidates)
+        append!(safety.candidates, [n for n in get_nodes(scene_tree)
+                                    if matches_template(Union{RobotNode,TransportUnitNode}, n)])
+    end
+    # The same agents that collision avoidance acts on (see rvo_add_agents!)
+    agents = [n for n in safety.candidates if matches_template(RobotNode, n) ?
+              is_root_node(scene_tree, n) : is_in_formation(n, scene_tree)]
+    pos = [SVector{2,Float64}(global_transform(n).translation[1:2]) for n in agents]
+    isrobot = [matches_template(RobotNode, n) for n in agents]
+    radius = [isrobot[i] ? default_robot_radius() : get_rvo_radius(agents[i]) for i in eachindex(agents)]
+
+    robot_gap, gap = Inf, Inf
+    for i in eachindex(agents), j in 1:i-1
+        d = norm(pos[i] - pos[j]) - radius[i] - radius[j]
+        gap = min(gap, d)
+        isrobot[i] && isrobot[j] && (robot_gap = min(robot_gap, d))
+    end
+    safety.min_gap = min(safety.min_gap, gap)
+    safety.robot_min_gap = min(safety.robot_min_gap, robot_gap)
+    gap < -1e-6 && (safety.overlap_steps += 1)
+    robot_gap < -1e-6 && (safety.robot_overlap_steps += 1)
+
+    positions = Dict{AbstractID,SVector{2,Float64}}()
+    for (n, p) in zip(agents, pos)
+        id = node_id(n)
+        prev = get(safety.positions, id, nothing)
+        prev === nothing || (safety.max_speed = max(safety.max_speed, norm(p - prev) / dt))
+        positions[id] = p
+    end
+    safety.positions = positions
+    return safety
+end
 
 function update_rvo_sim!(env::PlannerEnv)
     @unpack sched, scene_tree, cache = env
@@ -545,6 +614,9 @@ function swap_carrying_positions!(node::FormTransportUnit, agent_node::RobotGo, 
         tmp = rvo_get_agent_position(agent)
         rvo_set_agent_position!(agent, rvo_get_agent_position(other_agent))
         rvo_set_agent_position!(other_agent, tmp)
+        env.safety.swaps += 1
+        delete!(env.safety.positions, node_id(agent)) # a teleport is counted here, not as a speed
+        delete!(env.safety.positions, other_id)
     end
     return agent_node
 end
@@ -566,94 +638,6 @@ function query_policy_for_goal! end
 
 include("tangent_bug.jl")
 include("potential_fields.jl")
-
-"""
-    circle_avoidance_policy()
-
-Returns a 2D goal vector that will take the robot outside of circular boundary
-regions while pursuing its main goal
-"""
-function circle_avoidance_policy(circles, agent_radius, pos, nominal_goal;
-    planning_radius::Float64=agent_radius * 2,
-    detour_horizon::Float64=2 * planning_radius,
-    buffer=staging_buffer_radius(),
-)
-    dmin = Inf
-    id = nothing
-    circ = nothing
-    # Get the first circle to be intersected
-    # for (i,c) in enumerate(circles)
-    for (circ_id, c) in circles
-        x = get_center(c)
-        r = get_radius(c)
-        bloated_circle = LazySets.(x, r + agent_radius + buffer)
-        if circle_intersects_line(bloated_circle, pos, nominal_goal)
-            d = norm(x - pos) - (r + agent_radius) #- norm(x - pos) # penetration
-            if d < dmin
-                # penetration < 0 => pos is in circle
-                dmin = d
-                # idx = i
-                id = circ_id
-                circ = bloated_circle
-            end
-        end
-    end
-    goal = nominal_goal
-    if circ === nothing
-        # nothing in the way
-        return nominal_goal
-    end
-    c = get_center(circ)
-    r = get_radius(circ)
-    if norm(nominal_goal - c) < r # nominal_goal is in circle
-        # wait outside
-        # how to scale buffer here?
-        if norm(nominal_goal - c) > 1e-3
-            goal = c + normalize(nominal_goal - c) * r
-        else
-            goal = c + normalize(pos - c) * r
-        end
-    elseif dmin >= 0
-        # not currently in a circle, but on a course for intersection
-        if norm(nominal_goal - pos) < norm(nominal_goal - c)
-            # Just keep going toward goal (on the clear side)--this statement should never be reached
-            goal = nominal_goal
-        elseif dmin < detour_horizon
-            # detour to "skim" the circle
-            if dmin < 1e-3
-                dvec = pos - c
-                goal = pos .+ [-dvec[2], dvec[1]]
-            else
-                # Pick a tangent point to shoot for
-                pts = nearest_points_between_circles(
-                    pos[1:2], c[1:2], norm(pos - c), r
-                )
-                goal = sort([pts...], by=p -> norm(nominal_goal - [p...]))[1]
-            end
-        else
-            goal = nominal_goal
-        end
-    else
-        # get goal points on the edge of the circle
-        pts = nearest_points_between_circles(
-            pos[1:2], get_center(circ)[1:2], planning_radius, get_radius(circ),
-        )
-        if pts === nothing
-            goal = nominal_goal
-        else
-            # select closest point to goal
-            goal = sort([pts...], by=p -> norm(nominal_goal - [p...]))[1]
-        end
-    end
-    nominal_pt = pos + normalize(nominal_goal - pos) * min(planning_radius, norm(nominal_goal - pos))
-    f = g -> circle_intersection_with_line(circ, pos, g)
-    # if norm(nominal_pt .- c) > norm(goal .- c)
-    if f(nominal_pt) > f(goal)
-        return nominal_goal
-    else
-        return goal
-    end
-end
 
 inflate_circle(circ::LazySets.Ball2, r::Float64) = LazySets.Ball2(get_center(circ), get_radius(circ) + r)
 # inflate_circle(circ::GeometryBasics.HyperSphere,r::Float64) = GeometryBasics.HyperSphere(get_center(circ),get_radius(circ)+r)
@@ -806,7 +790,7 @@ function get_twist_cmd(node, env::PlannerEnv)
                 goal_pt = pos + vel * dt
                 goal = CoordinateTransformations.Translation(goal_pt..., 0.0) ∘ CoordinateTransformations.LinearMap(goal.linear)
                 twist = compute_twist_from_goal(agent, goal, dt) # nominal twist
-            else !(policy === nothing)
+            else
                 policy.dist_to_nearest_active_agent = 0.0
             end
         end
@@ -847,9 +831,24 @@ function get_cmd(node::Union{TransportUnitGo,RobotGo}, env::PlannerEnv)
         end
     end
 
+    twist = limit_acceleration!(env, agent, twist)
+    if isfinite(max_acceleration())
+        max_speed = min(max_speed, max(norm(twist.vel[1:2]), 1e-3))
+    end
     rvo_set_agent_max_speed!(agent, max_speed)
     rvo_set_agent_pref_velocity!(agent, twist.vel[1:2])
     return twist
+end
+
+function limit_acceleration!(env::PlannerEnv, agent, twist::Twist)
+    isfinite(max_acceleration()) || return twist
+    id = node_id(agent)
+    previous = get(env.commanded_velocity, id, zero(SVector{3,Float64}))
+    dv = twist.vel - previous
+    allowed = max_acceleration() * env.dt
+    vel = norm(dv) > allowed ? previous + dv * (allowed / norm(dv)) : twist.vel
+    env.commanded_velocity[id] = vel
+    return Twist(vel, twist.ω)
 end
 function get_cmd(node::Union{FormTransportUnit,DepositCargo}, env::PlannerEnv)
     agent = entity(node)

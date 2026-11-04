@@ -1,0 +1,2 @@
+model,method,seed,robots,iterations,population,placement,time_limit,solver,movement,status,makespan,planned,robot_min_gap,robot_overlap_steps,min_gap,overlap_steps,swaps,max_speed,assignment_time,execution_time,evaluations,timed_out,kept_greedy,termination,gap,bound,source_hash,git_commit
+imperial_star_destroyer,greedy,1,75,25,16,0,120,highs,1+1+1,success,158.95000000000002,106.89999999999999,-0.030282023826605886,7,-1.2182730421306598,1167,2,4.0017148819686135,15.062999963760376,1224.8079998493195,,,,,,,1ce4205b64cd,e6011a5

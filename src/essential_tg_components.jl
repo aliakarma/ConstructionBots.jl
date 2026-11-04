@@ -1115,7 +1115,6 @@ the allowable number of outgoing edges, and must be in `C`.
     t0::Vector{Int} = zeros(Int, nv(schedule)) # get_tF(schedule)
 end
 
-JuMP.termination_status(::AbstractGreedyAssignment) = MOI.OPTIMAL
 JuMP.primal_status(::AbstractGreedyAssignment) = MOI.FEASIBLE_POINT
 get_assignment_matrix(model::AbstractGreedyAssignment) = adjacency_matrix(get_graph(model.schedule))
 

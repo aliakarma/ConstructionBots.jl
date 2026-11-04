@@ -1,0 +1,2 @@
+model,method,seed,robots,iterations,population,placement,time_limit,solver,movement,status,makespan,planned,robot_min_gap,robot_overlap_steps,min_gap,overlap_steps,swaps,max_speed,assignment_time,execution_time,evaluations,timed_out,kept_greedy,termination,gap,bound,source_hash,git_commit
+x_wing,milp_w_greedy_warm_start,1,50,25,16,0,120,highs,1+1+1,success,177.55,120.59999999999995,-0.03959757935374013,11,-0.5126656733052701,265,1,4.000074859124476,487.1199998855591,1312.7090001106262,,,,TIME_LIMIT,0.6258291873963548,45.125,1ce4205b64cd,a854522

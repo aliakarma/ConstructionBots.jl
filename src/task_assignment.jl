@@ -367,12 +367,42 @@ function build_step_dependency_graph(sched,scene_tree)
 end
 
 """
-    assign_collaborative_tasks!(model)
+    NoAssignmentError(msg)
+
+No task assignment exists: too few robots, or a task order that cannot be completed.
+"""
+struct NoAssignmentError <: Exception
+    msg::String
+end
+Base.showerror(io::IO, e::NoAssignmentError) = print(io, "NoAssignmentError: ", e.msg)
+
+"""
+    assign_collaborative_tasks!(model; priority, use_finish_time, distance_dict, order)
 
 Assign collaborative tasks in a greedy manner.
+
+The defaults reproduce `GreedyOrderedAssignment`. The keywords let other dispatching rules
+reuse the same build-order-respecting loop (see assignment_algorithms.jl):
+- `priority(task_id)` returns a tuple; among the open tasks the smallest tuple is assigned
+  next, and ties are broken by the greedy cost (default `()`: greedy cost only).
+- `use_finish_time=false` drops the robots' current finish times from the cost, so robots
+  and tasks are matched by travel time alone.
+- `distance_dict` caches travel times; they depend only on geometry, so a cache can be shared
+  between repeated assignments of the same schedule.
+- the chosen task ids are pushed to `order`, in assignment order.
+- `include_travel=true` writes each assigned robot's travel time into the schedule as it goes,
+  so later choices and `makespan(sched)` account for it (otherwise travel only enters the
+  schedule later, in `update_project_schedule!`).
+- `travel_at_end=true` writes the travel times only after all choices are made: the choices stay
+  those of `include_travel=false`, but `makespan(sched)` is the true planned makespan.
 """
-function assign_collaborative_tasks!(model,
-        # D = construct_schedule_distance_matrix(model.schedule,model.problem_spec)
+function assign_collaborative_tasks!(model;
+        priority = task -> (),
+        use_finish_time::Bool = true,
+        distance_dict = Dict{Tuple{Int,Int},Float64}(),
+        order = nothing,
+        include_travel::Bool = false,
+        travel_at_end::Bool = false,
     )
     sched       = model.schedule
     scene_tree  = model.problem_spec
@@ -399,24 +429,25 @@ function assign_collaborative_tasks!(model,
 
     NUM_BUILD_STEPS = length([true for n in get_nodes(sched) if matches_template(OpenBuildStep,n)])
     BUILD_STEPS_CLOSED = 0
+    chosen = Pair{Int,Int}[]
 
     @info "Beginning task assignment"
     # initialize dependency graph to track and prevent cycles
     dependency_graph = build_step_dependency_graph(sched,scene_tree)
     # cost_func = (v,v2)->get_edge_cost(model,D,v,v2)
-    distance_dict = Dict{Tuple{Int,Int},Float64}()
     cost_func = (v,v2)->begin
         if !haskey(distance_dict,(v,v2))
             new_node = align_with_successor(get_node(sched,v).node,get_node(sched,v2).node)
             distance_dict[(v,v2)] = generate_path_spec(sched,scene_tree,new_node).min_duration
         end
-        return get_tF(sched,v) + distance_dict[(v,v2)]
+        return (use_finish_time ? get_tF(sched,v) : 0.0) + distance_dict[(v,v2)]
         # return distance_dict[(v,v2)]
         # get_edge_cost(model,D,v,v2)
     end
     while !isempty(active_build_steps)
         # get best possible assignment of robots to a team task
         best_cost       = Inf
+        best_rank       = nothing
         build_step_id   = nothing
         task_id         = nothing
         best_assignments = nothing
@@ -431,6 +462,12 @@ function assign_collaborative_tasks!(model,
                 if matches_template(AssemblyNode,cargo) && !(node_id(cargo) in assemblies_completed)
                     continue
                 end
+                rank = priority(task)
+                if best_rank !== nothing && rank > best_rank
+                    continue # a higher-priority task is already available
+                end
+                # only an equally ranked task has to beat the current best cost
+                bound = (best_rank !== nothing && rank == best_rank) ? best_cost : Inf
                 team_slots = Set(v for v in inneighbors(sched,task) if matches_template(RobotGo,get_node(sched,v)))
                 assignments = []
                 filt_func = (v,v2)->!has_path(dependency_graph,get_vtx(sched,task),v)
@@ -441,7 +478,7 @@ function assign_collaborative_tasks!(model,
                         filt_func,
                         )
                     cost = max(c,cost)
-                    if cost >= best_cost
+                    if cost >= bound
                         break
                     end
                     push!(assignments,robot=>slot)
@@ -456,23 +493,28 @@ function assign_collaborative_tasks!(model,
                     push!(robots,robot)
                 end
                 # update best assignment
-                if cost < best_cost
+                if cost < bound
                     build_step_id = step_id
                     task_id = task
                     best_assignments = assignments
                     best_cost = cost
+                    best_rank = rank
                     # @info "updating best assignment to $(summary(task)): $assignments"
                 end
             end
         end
         # update schedule
-        @assert !(best_assignments === nothing) "no assignment found!"
+        best_assignments === nothing && throw(NoAssignmentError(
+            "no assignment found: no free robots can take any of the open tasks"))
+        order === nothing || push!(order, task_id)
         # @info "best assignment selected $(summary(task_id)): $best_assignments"
         team_task_vtx = get_vtx(sched,task_id)
         open_step_vtx = get_vtx(sched,build_step_id)
         close_step_vtx = get_vtx(sched,CloseBuildStep(get_node(sched,build_step_id).node))
         for (robot,task) in best_assignments
             add_edge!(sched,robot,task)
+            include_travel && set_min_duration!(get_node(sched,robot), distance_dict[(robot,task)])
+            travel_at_end && push!(chosen, robot=>task)
             # add RobotNode -> TeamTask and OpenBuildStep -> TeamTask edges to dependency graph.
             add_edge!(dependency_graph, robot,          team_task_vtx)
             add_edge!(dependency_graph, open_step_vtx,  team_task_vtx)
@@ -513,6 +555,12 @@ function assign_collaborative_tasks!(model,
                 @info "Closing Assembly $(summary(node_id(entity(next_node))))"
             end
         end
+    end
+    if travel_at_end
+        for (robot,task) in chosen
+            set_min_duration!(get_node(sched,robot), distance_dict[(robot,task)])
+        end
+        update_schedule_times!(sched)
     end
     @info "Assignment Complete!"
     model

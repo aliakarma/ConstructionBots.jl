@@ -1,0 +1,83 @@
+planned = 14.875
+
+[[tasks]]
+cargo = "part 17"
+robots = [6]
+[[tasks]]
+cargo = "part 18"
+robots = [2]
+[[tasks]]
+cargo = "part 15"
+robots = [5]
+[[tasks]]
+cargo = "part 13"
+robots = [1]
+[[tasks]]
+cargo = "part 11"
+robots = [4, 9]
+[[tasks]]
+cargo = "part 10"
+robots = [3, 8]
+[[tasks]]
+cargo = "part 12"
+robots = [7, 10]
+[[tasks]]
+cargo = "assembly 6"
+robots = [1, 10]
+[[tasks]]
+cargo = "assembly 8"
+robots = [6]
+[[tasks]]
+cargo = "part 20"
+robots = [2]
+[[tasks]]
+cargo = "part 8"
+robots = [3, 8]
+[[tasks]]
+cargo = "part 9"
+robots = [7, 9]
+[[tasks]]
+cargo = "part 19"
+robots = [2]
+[[tasks]]
+cargo = "part 16"
+robots = [3, 8]
+[[tasks]]
+cargo = "part 6"
+robots = [1, 4]
+[[tasks]]
+cargo = "assembly 7"
+robots = [2]
+[[tasks]]
+cargo = "part 7"
+robots = [7]
+[[tasks]]
+cargo = "assembly 2"
+robots = [3, 8]
+[[tasks]]
+cargo = "part 14"
+robots = [2, 6]
+[[tasks]]
+cargo = "assembly 4"
+robots = [4, 9]
+[[tasks]]
+cargo = "part 4"
+robots = [3, 8]
+[[tasks]]
+cargo = "assembly 5"
+robots = [5, 10]
+[[tasks]]
+cargo = "assembly 3"
+robots = [1, 4, 7, 9]
+[[tasks]]
+cargo = "part 5"
+robots = [6]
+[[tasks]]
+cargo = "part 1"
+robots = [2]
+[[tasks]]
+cargo = "part 3"
+robots = [5]
+[[tasks]]
+cargo = "part 2"
+robots = [10]

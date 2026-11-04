@@ -11,6 +11,11 @@ using LinearAlgebra
 
 using Test
 using Logging
+using Random
+using TOML
+
+# The notebook's helper code is tested with the simulator (it loads no notebook machinery)
+include(joinpath(@__DIR__, "..", "notebooks", "notebook_helpers.jl"))
 
 # Set logging level
 global_logger(SimpleLogger(stderr, Logging.Warn))
@@ -58,8 +63,14 @@ end
     @testset "Twist" begin
         include("test_twist.jl")
     end
+    @testset "Comparison statistics" begin
+        include("test_comparison_statistics.jl")
+    end
 
     @testset "Demo" begin
         include("test_demo.jl")
+    end
+    @testset "Assignment algorithms" begin
+        include("test_assignment_algorithms.jl")
     end
 end

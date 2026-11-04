@@ -1,0 +1,7 @@
+# ConstructionLab dashboard (Python 3.11 or newer). Versions tested on Windows 11 with Python 3.13.
+# The simulator itself runs in Julia using the repository's own Project.toml / Manifest.toml.
+streamlit==1.66.0
+pandas==3.0.6
+altair==6.3.0
+# Tests only
+pytest==9.1.1
