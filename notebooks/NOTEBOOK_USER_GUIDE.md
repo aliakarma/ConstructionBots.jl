@@ -2,7 +2,8 @@
 
 This guide is for lab members who want to run ConstructionBots experiments without programming.
 Everything happens in one notebook: `notebooks/ConstructionBots_Experiment_Lab.ipynb`.
-If the software is not installed yet on your computer, follow `notebooks/SETUP.md` first (once).
+To open it, double-click `notebooks\start_notebook.bat` (Windows) or run `sh notebooks/start_notebook.sh` (Linux).
+The first start installs everything, which takes about an hour; `notebooks/SETUP.md` has the manual steps.
 
 ## Files
 
@@ -13,7 +14,9 @@ If the software is not installed yet on your computer, follow `notebooks/SETUP.m
 | `SETUP.md` | One-time installation. | No. |
 | `NOTEBOOK_USER_GUIDE.md` | This guide. | No. |
 
-## Opening the notebook
+## Opening the notebook in VS Code
+
+Instead of the start file above, you can use VS Code once the software is installed:
 
 1. Start VS Code and open the `ConstructionBots.jl` folder (*File → Open Folder…*).
 2. In the Explorer, open `notebooks` → `ConstructionBots_Experiment_Lab.ipynb`.

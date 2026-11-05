@@ -2,8 +2,9 @@
 
 Nothing here is specific to one computer. The Julia executable is found from, in order:
   1. the CONSTRUCTIONLAB_JULIA environment variable,
-  2. a juliaup installation matching the Julia version recorded in Manifest.toml,
-  3. `julia` on the PATH.
+  2. the Julia version recorded in Manifest.toml, in LOCALAPPDATA/Programs or a juliaup installation,
+  3. the newest juliaup installation,
+  4. `julia` on the PATH.
 """
 from __future__ import annotations
 
@@ -101,6 +102,13 @@ def find_julia(repo: Path = REPO_ROOT) -> JuliaInfo:
         return JuliaInfo(p if p.is_file() else None, "CONSTRUCTIONLAB_JULIA environment variable", expected)
 
     exe = "julia.exe" if os.name == "nt" else "julia"
+    # Where setup.ps1 and the official Windows installer put it. A different Julia may well be first on the PATH.
+    local_app_data = os.environ.get("LOCALAPPDATA", "")
+    if expected and local_app_data:
+        installed = Path(local_app_data) / "Programs" / f"Julia-{expected}" / "bin" / exe
+        if installed.is_file():
+            return JuliaInfo(installed, f"Julia {expected} in Programs, as recorded in Manifest.toml", expected)
+
     juliaup = Path.home() / ".julia" / "juliaup"
     if juliaup.is_dir():
         candidates = [d for d in juliaup.iterdir() if d.is_dir() and d.name.startswith("julia-") and (d / "bin" / exe).is_file()]

@@ -67,6 +67,37 @@ jobs:
           dirty = [i for i, c in enumerate(nb["cells"]) if c["cell_type"] == "code" and (c["outputs"] or c["execution_count"])]
           assert not dirty, f"clear the outputs of cells {dirty}: jupyter nbconvert --clear-output --inplace <notebook>"
           EOF
+  clean-install:
+    # What the README promises: on a clean machine, one command, and then the notebook and the dashboard work.
+    name: Clean install - ${{ matrix.os }}
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the setup script (Windows)
+        if: runner.os == 'Windows'
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1
+      - name: Run the setup script (Linux)
+        if: runner.os == 'Linux'
+        run: bash setup.sh
+      - name: Run the whole notebook, then the dashboard with real simulations
+        shell: bash
+        env:
+          CONSTRUCTIONLAB_REAL_TESTS: '1'
+        run: |
+          python="$PWD/dashboard/.venv/bin/python"
+          [ -x "$python" ] || python="$PWD/dashboard/.venv/Scripts/python.exe"
+          "$python" -m jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=3000 \
+            --output-dir "$RUNNER_TEMP" notebooks/ConstructionBots_Experiment_Lab.ipynb
+          cd dashboard
+          "$python" -m pytest tests/test_real_simulation.py
   docs:
     name: Documentation
     # Runs only on request: deploying needs GitHub Pages to be switched on for this repository.

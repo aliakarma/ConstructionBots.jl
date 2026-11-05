@@ -11,10 +11,13 @@ eval "$(conda shell.bash hook)"
 # conda-forge explicitly: the default channels refuse non-interactive use until their terms are accepted
 conda env list | grep -q "^$env_name " || conda create -y -n "$env_name" --override-channels -c conda-forge python=3.7 pip
 conda activate "$env_name"
-pip install cython==0.29.36
 src_dir="$(mktemp -d)"
-git clone --depth 1 https://github.com/sisl/Python-RVO2.git "$src_dir/Python-RVO2"
-(cd "$src_dir/Python-RVO2" && python setup.py build && python setup.py install)
+if ! python -c "import rvo2" 2> /dev/null; then
+    pip install cython==0.29.36
+    git clone https://github.com/sisl/Python-RVO2.git "$src_dir/Python-RVO2"
+    git -C "$src_dir/Python-RVO2" checkout 4174d402b4f229275f9f441709e8cf6aaece42c4
+    (cd "$src_dir/Python-RVO2" && python setup.py build && python setup.py install)
+fi
 python -c "import rvo2; assert hasattr(rvo2.PyRVOSimulator, 'setAgentAlpha'), 'not the sisl fork of RVO2'"
 echo "PyCall should use: $(command -v python)"
 if [ -n "${GITHUB_ENV:-}" ]; then
@@ -24,6 +27,7 @@ fi
 if [ ! -d "$ldraw_dir/parts" ]; then
     mkdir -p "$(dirname "$ldraw_dir")"
     curl -fsSL https://library.ldraw.org/library/updates/complete.zip -o "$src_dir/ldraw.zip"
-    python -m zipfile -e "$src_dir/ldraw.zip" "$(dirname "$ldraw_dir")"
+    python -m zipfile -e "$src_dir/ldraw.zip" "$src_dir/unpacked"
+    mv "$src_dir/unpacked/ldraw" "$ldraw_dir" # only once complete, so that stopping half-way cannot look finished
 fi
 rm -rf "$src_dir"

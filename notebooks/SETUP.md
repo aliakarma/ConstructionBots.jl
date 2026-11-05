@@ -1,5 +1,9 @@
 # Setting up the ConstructionBots Experiment Lab notebook
 
+**Most people do not need this guide.** Double-click `notebooks\start_notebook.bat` (Windows), or run
+`sh notebooks/start_notebook.sh` (Linux). The first start performs every step below automatically, and later
+starts open the notebook directly. Use this guide if the automatic setup stops with an error, or on macOS.
+
 This guide installs everything needed to run `notebooks/ConstructionBots_Experiment_Lab.ipynb`.
 It is written for **Windows 10/11** (the platform it was tested on) with notes for macOS/Linux.
 You do this **once per computer**. Afterwards, running experiments needs no installation.
@@ -103,6 +107,7 @@ from conda in a separate, throw-away environment and compiles the module directl
 
 # 2. Source code
 git clone https://github.com/sisl/Python-RVO2.git C:\rvo2build\Python-RVO2
+git -C C:\rvo2build\Python-RVO2 checkout 4174d402b4f229275f9f441709e8cf6aaece42c4
 $env:PATH = "C:\rvo2build\gcc\Library\mingw-w64\bin;$env:PATH"
 $PY  = "C:\Conda-Envs\lego_rvo2"
 $SRC = "C:\rvo2build\Python-RVO2\src"

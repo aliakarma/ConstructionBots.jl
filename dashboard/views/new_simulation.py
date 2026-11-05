@@ -335,6 +335,7 @@ def _run_panel(cat: Catalog, report) -> None:
     eng = services.engine()
     snap = eng.snapshot()
     busy = bool(snap.active_run or snap.queue)
+    st.session_state["_panel_busy"] = busy
     base = _config_from_state()
     env = report.env_status()
     mode = st.session_state["f_mode"]
@@ -430,6 +431,10 @@ def _monitor() -> None:
     if run_id != st.session_state.get("_viewer_run"):
         st.session_state["_viewer_run"] = run_id
         st.rerun()   # the viewer below must switch to the new run
+    now = services.engine().snapshot()
+    busy_now = bool(now.active_run or now.queue)
+    if busy_now != st.session_state.get("_panel_busy", busy_now):
+        st.rerun()   # the Run button is outside this fragment, so it would stay disabled after a run ends
     if run_id is None:
         return
     rec = services.run(run_id)

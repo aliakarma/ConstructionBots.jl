@@ -1,0 +1,3 @@
+# Each launcher must work whatever line-ending setting the person cloning has.
+*.bat text eol=crlf
+*.sh text eol=lf

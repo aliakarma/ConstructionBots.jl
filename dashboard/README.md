@@ -12,6 +12,10 @@ ConstructionLab does not re-implement anything. Every run calls the simulator's 
 
 ## 1. One-time setup
 
+**Windows:** double-click `dashboard\start_dashboard.bat`. **Linux:** run `sh dashboard/start_dashboard.sh` (install the
+build tools first: `sudo apt install git curl g++ cmake make`). The first start installs everything below automatically,
+which takes about an hour and 6 GB of disk space, and then opens the dashboard. Read on only to install it by hand.
+
 ConstructionLab needs the same things as the simulator, plus a small Python environment for the web interface.
 
 | What | Why | How |
@@ -29,7 +33,7 @@ dashboard's environment changes PyCall's configuration.
 
 ```powershell
 cd dashboard
-py -3 -m venv .venv
+py -3.13 -m venv .venv    # any version from 3.11 up; check with py -3.13 --version
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
@@ -41,21 +45,21 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Julia is found automatically: the dashboard looks for a juliaup installation of the Julia version recorded in
-`Manifest.toml` (1.10.12 here), then for `julia` on the PATH. If Julia is somewhere else, set
-`CONSTRUCTIONLAB_JULIA` to the full path of the `julia` executable before starting.
+Julia is found automatically: the dashboard looks for the Julia version recorded in `Manifest.toml` (1.10.12 here) in
+`%LOCALAPPDATA%\Programs` on Windows or in a juliaup installation, then for the newest juliaup installation, then for
+`julia` on the PATH. If Julia is somewhere else, set `CONSTRUCTIONLAB_JULIA` to the full path of the `julia` executable
+before starting.
 
 ## 2. Start the dashboard
 
-* **Windows:** double-click `dashboard\start_dashboard.bat` (it also performs the installation above the first
-  time), or run from the `dashboard` folder:
+* **Windows:** double-click `dashboard\start_dashboard.bat`, or run from the `dashboard` folder:
 
   ```powershell
   .\.venv\Scripts\python.exe -m streamlit run app.py
   ```
 
-* **macOS / Linux:** `sh dashboard/start_dashboard.sh`, or `.venv/bin/python -m streamlit run app.py` from the
-  `dashboard` folder.
+* **Linux:** `sh dashboard/start_dashboard.sh`, or `.venv/bin/python -m streamlit run app.py` from the `dashboard`
+  folder. **macOS:** only the second form, after installing by hand (not tested).
 
 Then open <http://localhost:8501>. Start it from the `dashboard` folder so that its settings
 (`.streamlit/config.toml`) apply. The dashboard listens on `localhost` only. To use another port, add

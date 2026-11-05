@@ -56,21 +56,38 @@ LEGO models are used to evaluate the algorithms. They provide a convenient frame
 
 ## Quick start
 
-The shortest route to a first result is the **Experiment Lab notebook**:
+You need [Git](https://git-scm.com/downloads). The setup installs everything else on its first start.
 
-1. Complete the [installation](#installation) once.
-2. Open [`notebooks/ConstructionBots_Experiment_Lab.ipynb`](notebooks/ConstructionBots_Experiment_Lab.ipynb) in Jupyter or VS Code (GitHub also shows it in the browser, read-only).
-3. Run the cells from top to bottom. Every line of the Setup table should read **OK**.
+```bash
+git clone https://github.com/aliakarma/ConstructionBots.jl.git
+```
 
-Prefer a script? After installation, run the default demo from the Julia REPL:
+If the clone stops on a slow connection, add `--depth 1 --single-branch` for a much smaller download.
+
+| | Windows 10/11 | Linux |
+| --- | --- | --- |
+| **Dashboard** | double-click `dashboard\start_dashboard.bat` | `sh dashboard/start_dashboard.sh` |
+| **Notebook** | double-click `notebooks\start_notebook.bat` | `sh notebooks/start_notebook.sh` |
+| Install only | double-click `setup.bat` | `bash setup.sh` |
+
+The first start downloads and builds Julia 1.10, the packages, the LDraw parts and RVO2. Allow about an hour and 6 GB of disk space. It is safe to stop: running it again continues where it stopped. It finishes with a real simulation, and it should print `OK: the simulator works and reproduces the recorded result.` Later starts take seconds.
+
+On Linux, install the build tools first: `sudo apt install git curl g++ cmake make`. macOS has not been tested; follow the [manual installation](#installation).
+
+In the notebook, run the cells from top to bottom. Every line of the Setup table should read **OK**, except that Gurobi reads **WARNING** without a licence. HiGHS and GLPK are installed for free.
+
+Prefer a script? After installation, run the default demo from the Julia REPL (`julia --project`):
 
 ```julia
 include("scripts/demos.jl")
 ```
 
-Prefer a point-and-click interface? Start the [dashboard](#constructionlab-dashboard).
-
 ## Installation
+
+You only need this section if you do not use the setup above.
+
+> [!IMPORTANT]
+> Use Julia 1.10. `julia --version` must not report another version, because `Manifest.toml` and the recorded results come from 1.10.12. With juliaup: `juliaup add 1.10`, then start Julia as `julia +1.10`.
 
 | Requirement | Needed for | Where to get it |
 | --- | --- | --- |
@@ -87,12 +104,12 @@ The Gurobi Julia package installs without a licence. HiGHS and GLPK are free and
 
 ### 1. Julia project
 
-Clone the repository and instantiate the environment. `Manifest.toml` pins the exact package versions, so a clone gets the same versions the recorded results used.
+Clone the repository and instantiate the environment. `Manifest.toml` pins the exact package versions, so a clone gets the same versions the recorded results used. Do [RVO2](#3-rvo2) first if you can: without `PYTHON` set, PyCall's build downloads its own Miniconda, which you then replace.
 
 ```bash
 git clone https://github.com/aliakarma/ConstructionBots.jl.git
 cd ConstructionBots.jl
-julia --project -e 'using Pkg; Pkg.instantiate(); Pkg.build()'
+julia --project -e 'using Pkg; Pkg.instantiate()'
 ```
 
 ### 2. LDraw parts library
@@ -203,17 +220,17 @@ Replace `<hash>` with the code hash in the name of the CSV file that the `run` c
 
 #### Set up the dashboard
 
-The dashboard needs everything from the [installation](#installation) above (Julia project, LDraw library, RVO2), plus a Python 3.11+ environment for the web interface. This is a different Python from the one PyCall uses for RVO2, and it does not change PyCall's configuration.
+The [quick start](#quick-start) sets it up. To do it by hand, the dashboard needs everything from the [installation](#installation) above (Julia project, LDraw library, RVO2), plus a Python 3.11+ environment for the web interface. This is a different Python from the one PyCall uses for RVO2, and it does not change PyCall's configuration.
 
-Windows (PowerShell, from the repository folder):
+Windows (PowerShell, from the repository folder). Check the version first: `py -3.13 --version` must report 3.11 or newer, otherwise use another version number.
 
 ```powershell
 cd dashboard
-py -3 -m venv .venv
+py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-macOS / Linux:
+macOS / Linux (`python3 --version` must report 3.11 or newer):
 
 ```bash
 cd dashboard
@@ -221,19 +238,19 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Julia is found automatically (a juliaup installation of the version recorded in `Manifest.toml`, then `julia` on the PATH). If Julia is elsewhere, set `CONSTRUCTIONLAB_JULIA` to the full path of the `julia` executable before starting.
+Julia is found automatically: the version recorded in `Manifest.toml` (in `%LOCALAPPDATA%\Programs` on Windows, or a juliaup installation), then the newest juliaup installation, then `julia` on the PATH. If Julia is elsewhere, set `CONSTRUCTIONLAB_JULIA` to the full path of the `julia` executable before starting.
 
 #### Start the dashboard
 
 Start it from the `dashboard` folder so that its settings (`.streamlit/config.toml`) apply.
 
-- **Windows:** double-click `dashboard\start_dashboard.bat` (it also performs the setup above the first time), or run from the `dashboard` folder:
+- **Windows:** double-click `dashboard\start_dashboard.bat`, or run from the `dashboard` folder:
 
   ```powershell
   .\.venv\Scripts\python.exe -m streamlit run app.py
   ```
 
-- **macOS / Linux:** run `sh dashboard/start_dashboard.sh`, or run from the `dashboard` folder:
+- **Linux:** run `sh dashboard/start_dashboard.sh`, or run from the `dashboard` folder:
 
   ```bash
   .venv/bin/python -m streamlit run app.py
@@ -278,7 +295,8 @@ These demos are hosted by the upstream project. Their numbers were not made with
 | Path | Contents |
 | --- | --- |
 | `src/` | The simulator, including `full_demo.jl` (`run_lego_demo`) and `assignment_algorithms.jl` |
-| `scripts/` | `demos.jl`, `method_comparison.jl`, `setup_rvo2.sh` and helper scripts |
+| `setup.bat`, `setup.ps1`, `setup.sh` | One-command setup for Windows and Linux |
+| `scripts/` | `demos.jl`, `method_comparison.jl`, `verify_install.jl`, `setup_julia.jl`, `setup_rvo2.sh` and helper scripts |
 | `notebooks/` | The Experiment Lab notebook, its helper code, `SETUP.md` and `NOTEBOOK_USER_GUIDE.md` |
 | `dashboard/` | ConstructionLab, the local web dashboard (Python and Streamlit) |
 | `LDraw_files/` | LEGO model files (`.mpd`) |

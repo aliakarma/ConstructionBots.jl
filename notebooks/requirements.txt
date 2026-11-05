@@ -1,0 +1,2 @@
+# JupyterLab for the Experiment Lab notebook, installed by the setup scripts into dashboard/.venv. Tested with Python 3.13.
+jupyterlab==4.3.4
