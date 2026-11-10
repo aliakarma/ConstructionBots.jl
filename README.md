@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Julia 1.10](https://img.shields.io/badge/Julia-1.10-9558B2?logo=julia&logoColor=white)](https://julialang.org/)
 [![Open the Experiment Lab notebook](https://img.shields.io/badge/Notebook-Experiment%20Lab-F37626?logo=jupyter&logoColor=white)](notebooks/ConstructionBots_Experiment_Lab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/aliakarma/ConstructionBots.jl/blob/master/notebooks/ConstructionBots_Experiment_Lab_Colab.ipynb)
 [![Paper (arXiv)](https://img.shields.io/badge/Paper-arXiv-B31B1B?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2311.00192)
 [![Paper (RAS)](https://img.shields.io/badge/Paper-RAS-blue)](https://www.sciencedirect.com/science/article/abs/pii/S0921889025002763)
 
@@ -56,7 +57,9 @@ LEGO models are used to evaluate the algorithms. They provide a convenient frame
 
 ## Quick start
 
-You need [Git](https://git-scm.com/downloads). The setup installs everything else on its first start.
+**Nothing to install:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/aliakarma/ConstructionBots.jl/blob/master/notebooks/ConstructionBots_Experiment_Lab_Colab.ipynb) opens the Experiment Lab notebook in Google Colab (a Google account is needed). Choose **Runtime → Run all** (and **Run anyway** if Colab warns that the notebook was not authored by Google): the first cell installs everything on Colab's machine in about 20–30 minutes, then the notebook runs as it does locally. Colab deletes the machine and its results when the session ends, so download them with the notebook's last cell.
+
+To run it on your own computer, you need [Git](https://git-scm.com/downloads). The setup installs everything else on its first start.
 
 ```bash
 git clone https://github.com/aliakarma/ConstructionBots.jl.git
@@ -167,6 +170,8 @@ rvo = pyimport("rvo2")
 - run one experiment and see the result table, the planned schedule, the search progress and a 3-D animation (Section 4),
 - compare algorithms on the same problem (Section 5) and repeat them over several seeds with paired statistical tests (Section 6),
 - export results to CSV (Section 7).
+
+[`notebooks/ConstructionBots_Experiment_Lab_Colab.ipynb`](notebooks/ConstructionBots_Experiment_Lab_Colab.ipynb) is the same notebook for Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/aliakarma/ConstructionBots.jl/blob/master/notebooks/ConstructionBots_Experiment_Lab_Colab.ipynb). Its first cell clones this repository and installs Julia 1.10.12, RVO2, the LDraw parts and the packages on Colab's machine. Its Julia cells are the local notebook's cells unchanged, marked `%%julia`.
 
 The first experiment after a restart takes 1–3 minutes because Julia compiles the code. See [`notebooks/NOTEBOOK_USER_GUIDE.md`](notebooks/NOTEBOOK_USER_GUIDE.md) for a longer guide.
 
